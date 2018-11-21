@@ -3,32 +3,32 @@ import numpy
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-
+from cv2.ximgproc import createSuperpixelSLIC as SLIC
 class SuperPixelStereo:
 	def __init__(self):
 		self.Init = False
 
 	def initialize(self,im):
 		self.height,self.width,self.channels = im.shape
-		self.seeds = cv2.ximgproc.createSuperpixelSEEDS(self.width,self.height,self.channels, 400, 4)
+		self.seeds = cv2.ximgproc.createSuperpixelSEEDS(self.width,self.height,self.channels, 100, 4,5,5)
+		#self.slic = cv2.ximgproc.createSuperpixelSLIC(converted,algorithm+SLIC,region_size,float(ruler))
 		self.Init = True
 
 	def getDisparity(self,imL,imR):
 		if ~self.Init:
 			self.initialize(imL)
 			print("init")
-		labelsL,labelsR=self.segmentImage(imL,imR)
+		labelsL,labelsR=self.segmentImageSLIC(imL,imR)
 		hogL,chL=self.getDescriptors(imL,labelsL)
 		hogR,chR=self.getDescriptors(imR,labelsR)
 		print(hogL.shape,chL.shape)
-		desL=np.concatenate((hogL,chL),axis=1).astype(np.uint8)
-		desR=np.concatenate((hogR,chR),axis=1).astype(np.uint8)
-		#orb = cv2.ORB_create()
-		#kp1, des1 = orb.detectAndCompute(imL,None)
+		#desL=np.concatenate((hogL,chL),axis=1).astype(np.uint8)
+		#desR=np.concatenate((hogR,chR),axis=1).astype(np.uint8)
+		desL=hogL.astype(np.uint8)
+		desR=hogR.astype(np.uint8)
 		kp1=self.getPixelCentroid(labelsL)
 		kp2=self.getPixelCentroid(labelsR)
 		self.getPixelCentroid(labelsL)
-		#print(desL.shape,desR.shape,type(desL),type(des1),des1.shape,kp1[1].pt)
 		# create BFMatcher object
 		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
 		# Match descriptors.
@@ -37,12 +37,44 @@ class SuperPixelStereo:
 		# Sort them in the order of their distance.
 		matches = sorted(matches, key = lambda x:x.distance)
 		# Draw first 10 matches.
-		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,matches[:10],None)
+		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,matches,None)
 		plt.imshow(img3),plt.show()
 
-	def segmentImage(self,imL,imR):
+	def segmentImageSLIC(self,imL,imR):
+		smoothness=300.0
+		size=100
+
 		st=time.time()
-		self.seeds.iterate(imL, 4) 
+		slL=SLIC(imL,region_size=size,ruler=smoothness)
+		slL.iterate(10)
+		labelsL = slL.getLabels() # retrieve the segmentation result
+		leftSP=slL.getNumberOfSuperpixels()
+		mask=slL.getLabelContourMask(False)
+		color_img = np.zeros((self.height,self.width,3), np.uint8)
+		color_img[:] = (0, 0, 255)
+		mask_inv = cv2.bitwise_not(mask)
+		result_bg = cv2.bitwise_and(imL, imL, mask=mask_inv)
+		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
+		self.markedL = cv2.add(result_bg, result_fg)
+		slR=SLIC(imR,region_size=size,ruler=smoothness)
+		slR.iterate(10)
+		labelsR = slR.getLabels()# retrieve the segmentation result
+		rightSP=slR.getNumberOfSuperpixels()
+		mask=slR.getLabelContourMask(False)
+		mask_inv = cv2.bitwise_not(mask)
+		result_bg = cv2.bitwise_and(imR, imR, mask=mask_inv)
+		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
+		self.markedR = cv2.add(result_bg, result_fg)
+		print("Segmentation Time: "+str(time.time()-st))
+		if leftSP != rightSP:
+			print("Number of superpixels do not match")
+		else:
+			self.NSP=leftSP
+			return labelsL,labelsR
+
+	def segmentImageSEEDS(self,imL,imR):
+		st=time.time()
+		self.seeds.iterate(imL, 8) 
 		labelsL = self.seeds.getLabels() # retrieve the segmentation result
 		leftSP=self.seeds.getNumberOfSuperpixels()
 		mask=self.seeds.getLabelContourMask(False)
@@ -52,7 +84,7 @@ class SuperPixelStereo:
 		result_bg = cv2.bitwise_and(imL, imL, mask=mask_inv)
 		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
 		self.markedL = cv2.add(result_bg, result_fg)
-		self.seeds.iterate(imR, 4)
+		self.seeds.iterate(imR, 8)
 		labelsR = self.seeds.getLabels()# retrieve the segmentation result
 		rightSP=self.seeds.getNumberOfSuperpixels()
 		mask=self.seeds.getLabelContourMask(False)
@@ -72,7 +104,7 @@ class SuperPixelStereo:
 		mag,angle=self.getOG(img)
 		hog=self.getHOG(mag,angle,labels)
 		hsvim = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-		Bin_size=[10, 4, 4]
+		Bin_size=[17, 4, 4]
 		ch=np.empty((self.NSP,np.prod(Bin_size)))
 		for label in range(self.NSP):
 			#Mask=np.equal(label,labels)
@@ -105,7 +137,7 @@ class SuperPixelStereo:
 
 	def getHOG(self,mag,angle,labels):
 		st=time.time()
-		n_bins=16
+		n_bins=32
 		dBin=365.0/(n_bins-1)
 		HOG=np.zeros((self.NSP,32))
 		indx=np.mgrid[0:5,0:5]
