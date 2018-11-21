@@ -22,8 +22,8 @@ class SuperPixelStereo:
 		hogL,chL=self.getDescriptors(imL,labelsL)
 		hogR,chR=self.getDescriptors(imR,labelsR)
 		print(hogL.shape,chL.shape)
-		#desL=np.concatenate((hogL,chL),axis=1).astype(np.uint8)
-		#desR=np.concatenate((hogR,chR),axis=1).astype(np.uint8)
+		#desL=np.concatenate((hogL,chL/10),axis=1).astype(np.uint8)
+		#desR=np.concatenate((hogR,chR/10),axis=1).astype(np.uint8)
 		desL=hogL.astype(np.uint8)
 		desR=hogR.astype(np.uint8)
 		kp1=self.getPixelCentroid(labelsL)
@@ -137,9 +137,9 @@ class SuperPixelStereo:
 
 	def getHOG(self,mag,angle,labels):
 		st=time.time()
-		n_bins=32
+		n_bins=64
 		dBin=365.0/(n_bins-1)
-		HOG=np.zeros((self.NSP,32))
+		HOG=np.zeros((self.NSP,n_bins))
 		indx=np.mgrid[0:5,0:5]
 		Bins=np.rint(np.divide(angle.ravel(),dBin)).astype(np.uint8)
 		for m,a,l,b in zip(mag.ravel(),angle.ravel(),labels.ravel(),Bins):
