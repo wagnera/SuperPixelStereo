@@ -32,16 +32,17 @@ class SuperPixelStereo:
 
 	def getDisparityLine(self,imL,imR):
 		self.height,self.width,self.channels = imL.shape
-		self.seeds = cv2.ximgproc.createSuperpixelSEEDS(self.width,self.height,self.channels, 100, 4,5,5)
-		labelsL,labelsR=self.segmentImageSEEDS(imL,imR)
-		hogL,chL=self.getDescriptors(imL,labelsL)
-		hogR,chR=self.getDescriptors(imR,labelsR)
-		#desL=np.concatenate((hogL,chL/10),axis=1).astype(np.uint8)
-		#desR=np.concatenate((hogR,chR/10),axis=1).astype(np.uint8)
-		desL=chL.astype(np.uint8)
-		desR=chR.astype(np.uint8)
+		self.seeds = cv2.ximgproc.createSuperpixelSEEDS(self.width,self.height,self.channels, 50, 4,5,5)
+		labelsL,labelsR=self.segmentImageSLIC(imL,imR)
 		kp1=self.getPixelCentroid(labelsL)
 		kp2=self.getPixelCentroid(labelsR)
+		hogL,chL=self.getDescriptors(imL,labelsL)
+		hogR,chR=self.getDescriptors(imR,labelsR)
+		desL=np.concatenate((hogL,chL),axis=1).astype(np.uint8)
+		desR=np.concatenate((hogR,chR),axis=1).astype(np.uint8)
+		#desL=chL.astype(np.uint8)
+		#desR=chR.astype(np.uint8)
+
 		#self.getPixelCentroid(labelsL)
 		# create BFMatcher object
 		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
@@ -51,7 +52,8 @@ class SuperPixelStereo:
 		# Sort them in the order of their distance.
 		matches = sorted(matches, key = lambda x:x.distance)
 		# Draw first 10 matches.
-		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,matches,None)
+		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,matches[:1],None)
+		#plt.imshow(img3),plt.show()
 		return img3
 
 	def segmentImageSLIC(self,imL,imR):
@@ -60,7 +62,7 @@ class SuperPixelStereo:
 
 		st=time.time()
 		slL=SLIC(imL,region_size=size,ruler=smoothness)
-		slL.iterate(10)
+		slL.iterate(30)
 		labelsL = slL.getLabels() # retrieve the segmentation result
 		leftSP=slL.getNumberOfSuperpixels()
 		mask=slL.getLabelContourMask(False)
@@ -71,7 +73,7 @@ class SuperPixelStereo:
 		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
 		self.markedL = cv2.add(result_bg, result_fg)
 		slR=SLIC(imR,region_size=size,ruler=smoothness)
-		slR.iterate(10)
+		slR.iterate(30)
 		labelsR = slR.getLabels()# retrieve the segmentation result
 		rightSP=slR.getNumberOfSuperpixels()
 		mask=slR.getLabelContourMask(False)
@@ -88,7 +90,7 @@ class SuperPixelStereo:
 
 	def segmentImageSEEDS(self,imL,imR):
 		st=time.time()
-		self.seeds.iterate(imL, 8) 
+		self.seeds.iterate(imL, 20) 
 		labelsL = self.seeds.getLabels() # retrieve the segmentation result
 		leftSP=self.seeds.getNumberOfSuperpixels()
 		mask=self.seeds.getLabelContourMask(False)
@@ -98,7 +100,7 @@ class SuperPixelStereo:
 		result_bg = cv2.bitwise_and(imL, imL, mask=mask_inv)
 		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
 		self.markedL = cv2.add(result_bg, result_fg)
-		self.seeds.iterate(imR, 8)
+		self.seeds.iterate(imR, 20)
 		labelsR = self.seeds.getLabels()# retrieve the segmentation result
 		rightSP=self.seeds.getNumberOfSuperpixels()
 		mask=self.seeds.getLabelContourMask(False)
@@ -147,8 +149,8 @@ class SuperPixelStereo:
 		HOG=np.zeros((self.NSP,n_bins))
 		indx=np.mgrid[0:5,0:5]
 		Bins=np.rint(np.divide(angle.ravel(),dBin)).astype(np.uint8)
-		#for m,a,l,b in zip(mag.ravel(),angle.ravel(),labels.ravel(),Bins):
-			#HOG[l,b]+=a
+		for m,a,l,b in zip(mag.ravel(),angle.ravel(),labels.ravel(),Bins):
+			HOG[l,b]+=a
 		print("HOG Time: "+str(time.time()-st))
 		return HOG
 
