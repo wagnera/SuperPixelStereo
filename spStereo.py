@@ -41,11 +41,12 @@ class SuperPixelStereo:
 		plt.imshow(img3),plt.show()
 
 	def segmentImageSLIC(self,imL,imR):
-		smoothness=300.0
-		size=100
+		smoothness=50.0
+		size=50
 
 		st=time.time()
-		slL=SLIC(imL,region_size=size,ruler=smoothness)
+		imLLAB = cv2.cvtColor(imL, cv2.COLOR_BGR2LAB)
+		slL=SLIC(imLLAB,region_size=size,ruler=smoothness,algorithm=101)
 		slL.iterate(10)
 		labelsL = slL.getLabels() # retrieve the segmentation result
 		leftSP=slL.getNumberOfSuperpixels()
@@ -55,8 +56,11 @@ class SuperPixelStereo:
 		mask_inv = cv2.bitwise_not(mask)
 		result_bg = cv2.bitwise_and(imL, imL, mask=mask_inv)
 		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
-		self.markedL = cv2.add(result_bg, result_fg)
-		slR=SLIC(imR,region_size=size,ruler=smoothness)
+		markedL = cv2.add(result_bg, result_fg)
+		self.markedL=cv2.cvtColor(markedL,cv2.COLOR_BGR2RGB)
+
+		imRLAB = cv2.cvtColor(imR, cv2.COLOR_BGR2LAB)
+		slR=SLIC(imRLAB,region_size=size,ruler=smoothness,algorithm=101)
 		slR.iterate(10)
 		labelsR = slR.getLabels()# retrieve the segmentation result
 		rightSP=slR.getNumberOfSuperpixels()
@@ -64,10 +68,12 @@ class SuperPixelStereo:
 		mask_inv = cv2.bitwise_not(mask)
 		result_bg = cv2.bitwise_and(imR, imR, mask=mask_inv)
 		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
-		self.markedR = cv2.add(result_bg, result_fg)
+		markedR = cv2.add(result_bg, result_fg)
+		self.markedR=cv2.cvtColor(markedR,cv2.COLOR_BGR2RGB)
 		print("Segmentation Time: "+str(time.time()-st))
 		if leftSP != rightSP:
-			print("Number of superpixels do not match")
+			print("ERROR: Number of superpixels do not match")
+			exit(1)
 		else:
 			self.NSP=leftSP
 			return labelsL,labelsR
@@ -104,7 +110,7 @@ class SuperPixelStereo:
 		mag,angle=self.getOG(img)
 		hog=self.getHOG(mag,angle,labels)
 		hsvim = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-		Bin_size=[17, 4, 4]
+		Bin_size=[10, 4, 4]
 		ch=np.empty((self.NSP,np.prod(Bin_size)))
 		for label in range(self.NSP):
 			#Mask=np.equal(label,labels)
