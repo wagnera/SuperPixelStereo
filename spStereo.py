@@ -18,7 +18,7 @@ class SuperPixelStereo:
 		if ~self.Init:
 			self.initialize(imL)
 			print("init")
-		n_lines=10
+		n_lines=15
 		row_idxs=range(self.Height)
 		cs=int(ceil(self.Height/n_lines))
 		chunks=[row_idxs[i:i+cs] for i in range(0, len(row_idxs), cs)]
@@ -38,10 +38,10 @@ class SuperPixelStereo:
 		kp2=self.getPixelCentroid(labelsR)
 		hogL,chL=self.getDescriptors(imL,labelsL)
 		hogR,chR=self.getDescriptors(imR,labelsR)
-		desL=np.concatenate((hogL,chL),axis=1).astype(np.uint8)
-		desR=np.concatenate((hogR,chR),axis=1).astype(np.uint8)
-		#desL=chL.astype(np.uint8)
-		#desR=chR.astype(np.uint8)
+		#desL=np.concatenate((hogL,chL),axis=1).astype(np.uint8)
+		#desR=np.concatenate((hogR,chR),axis=1).astype(np.uint8)
+		desL=chL.astype(np.uint8)
+		desR=chR.astype(np.uint8)
 
 		#self.getPixelCentroid(labelsL)
 		# create BFMatcher object
@@ -52,17 +52,18 @@ class SuperPixelStereo:
 		# Sort them in the order of their distance.
 		matches = sorted(matches, key = lambda x:x.distance)
 		# Draw first 10 matches.
-		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,matches[:1],None)
+		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,matches[:5],None)
 		#plt.imshow(img3),plt.show()
 		return img3
 
 	def segmentImageSLIC(self,imL,imR):
-		smoothness=300.0
-		size=100
+		smoothness=50.0
+		size=20
 
 		st=time.time()
 		slL=SLIC(imL,region_size=size,ruler=smoothness)
-		slL.iterate(30)
+		slL.iterate(10)
+		#slL.enforceLabelConnectivity(min_element_size=10)
 		labelsL = slL.getLabels() # retrieve the segmentation result
 		leftSP=slL.getNumberOfSuperpixels()
 		mask=slL.getLabelContourMask(False)
@@ -72,8 +73,10 @@ class SuperPixelStereo:
 		result_bg = cv2.bitwise_and(imL, imL, mask=mask_inv)
 		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
 		self.markedL = cv2.add(result_bg, result_fg)
+
 		slR=SLIC(imR,region_size=size,ruler=smoothness)
-		slR.iterate(30)
+		#slR.enforceLabelConnectivity(min_element_size=10)
+		slR.iterate(10)
 		labelsR = slR.getLabels()# retrieve the segmentation result
 		rightSP=slR.getNumberOfSuperpixels()
 		mask=slR.getLabelContourMask(False)
@@ -120,7 +123,7 @@ class SuperPixelStereo:
 		mag,angle=self.getOG(img)
 		hog=self.getHOG(mag,angle,labels)
 		hsvim = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-		Bin_size=[17, 4, 4]
+		Bin_size=[25, 3, 3]
 		ch=np.empty((self.NSP,np.prod(Bin_size)))
 		for label in range(self.NSP):
 			Mask=np.array(np.equal(label,labels),dtype=np.uint8)
