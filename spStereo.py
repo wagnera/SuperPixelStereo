@@ -21,26 +21,45 @@ class SuperPixelStereo:
 		hogL,chL=self.getDescriptors(imL,labelsL)
 		hogR,chR=self.getDescriptors(imR,labelsR)
 		print(hogL.shape,chL.shape)
-		desL=np.array([hogL.ravel(),chL.ravel()])
-		desR=np.array([hogR.ravel(),chR.ravel()])
-		"""# create BFMatcher object
+		desL=np.concatenate((hogL,chL),axis=1).astype(np.uint8)
+		desR=np.concatenate((hogR,chR),axis=1).astype(np.uint8)
+		#orb = cv2.ORB_create()
+		#kp1, des1 = orb.detectAndCompute(imL,None)
+		kp1=self.getPixelCentroid(labelsL)
+		kp2=self.getPixelCentroid(labelsR)
+		self.getPixelCentroid(labelsL)
+		#print(desL.shape,desR.shape,type(desL),type(des1),des1.shape,kp1[1].pt)
+		# create BFMatcher object
 		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
 		# Match descriptors.
 		matches = bf.match(desL,desR)
+		#print(matches[11].trainIdx)
 		# Sort them in the order of their distance.
 		matches = sorted(matches, key = lambda x:x.distance)
 		# Draw first 10 matches.
-		img3 = cv2.drawMatches(img1,kp1,img2,kp2,matches[:10], flags=2)
-		plt.imshow(img3),plt.show()"""
+		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,matches[:10],None)
+		plt.imshow(img3),plt.show()
 
 	def segmentImage(self,imL,imR):
 		st=time.time()
 		self.seeds.iterate(imL, 4) 
 		labelsL = self.seeds.getLabels() # retrieve the segmentation result
 		leftSP=self.seeds.getNumberOfSuperpixels()
+		mask=self.seeds.getLabelContourMask(False)
+		color_img = np.zeros((self.height,self.width,3), np.uint8)
+		color_img[:] = (0, 0, 255)
+		mask_inv = cv2.bitwise_not(mask)
+		result_bg = cv2.bitwise_and(imL, imL, mask=mask_inv)
+		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
+		self.markedL = cv2.add(result_bg, result_fg)
 		self.seeds.iterate(imR, 4)
 		labelsR = self.seeds.getLabels()# retrieve the segmentation result
 		rightSP=self.seeds.getNumberOfSuperpixels()
+		mask=self.seeds.getLabelContourMask(False)
+		mask_inv = cv2.bitwise_not(mask)
+		result_bg = cv2.bitwise_and(imR, imR, mask=mask_inv)
+		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
+		self.markedR = cv2.add(result_bg, result_fg)
 		print("Segmentation Time: "+str(time.time()-st))
 		if leftSP != rightSP:
 			print("Number of superpixels do not match")
@@ -53,6 +72,8 @@ class SuperPixelStereo:
 		mag,angle=self.getOG(img)
 		hog=self.getHOG(mag,angle,labels)
 		hsvim = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+		Bin_size=[10, 4, 4]
+		ch=np.empty((self.NSP,np.prod(Bin_size)))
 		for label in range(self.NSP):
 			#Mask=np.equal(label,labels)
 			#Mask=np.repeat(Mask[:, :, np.newaxis], 3, axis=2)
@@ -61,7 +82,7 @@ class SuperPixelStereo:
 			#segment=cv2.bitwise_and(img,img,mask = Mask)
 			#segment=np.compress(Mask.flatten(),img.flatten())
 			#segment=np.ma.masked_less_equal(segment,0)
-			ch = cv2.calcHist([hsvim], [0, 1, 2], Mask, [10, 4, 4], [0, 180, 0, 255, 0, 255])
+			ch[label,:] = cv2.calcHist([hsvim], [0, 1, 2], Mask, Bin_size, [0, 180, 0, 255, 0, 255]).ravel()	
 			#print(h.flatten())
 			#cv2.imshow('asd',hsvim)
 			#cv2.waitKey()
@@ -86,7 +107,7 @@ class SuperPixelStereo:
 		st=time.time()
 		n_bins=16
 		dBin=365.0/(n_bins-1)
-		HOG=np.zeros((len(labels)-1,32))
+		HOG=np.zeros((self.NSP,32))
 		indx=np.mgrid[0:5,0:5]
 		Bins=np.rint(np.divide(angle.ravel(),dBin)).astype(np.uint8)
 		for m,a,l,b in zip(mag.ravel(),angle.ravel(),labels.ravel(),Bins):
@@ -94,24 +115,21 @@ class SuperPixelStereo:
 		print("HOG Time: "+str(time.time()-st))
 		return HOG
 
-	"""def getHOG(self,img):
-		winSize = (20,20)
-		blockSize = (10,10)
-		blockStride = (5,5)
-		cellSize = (10,10)
-		nbins = 9
-		derivAperture = 1
-		winSigma = -1.
-		histogramNormType = 0
-		L2HysThreshold = 0.2
-		gammaCorrection = 1
-		nlevels = 64
-		signedGradients = True
+	def getPixelCentroid(self,labels):
+		nx, ny = (self.height, self.width)
+		x = np.linspace(0, 1, nx)
+		y = np.linspace(0, 1, ny)
+		xv, yv = np.meshgrid(x, y)
+		ipt_storage=[[] for i in range(self.NSP)]
+		jpt_storage=[[]for i in range(self.NSP)]
+		for i in range(self.height):
+			for j in range(self.width):
+				ipt_storage[labels[i,j]].append(i)
+				jpt_storage[labels[i,j]].append(j)
 
-		hog = cv2.HOGDescriptor(winSize,blockSize,blockStride,
-			cellSize,nbins,derivAperture,winSigma,histogramNormType,L2HysThreshold,gammaCorrection,nlevels, signedGradients)
-		descriptor=hog.compute(img)
-		print(descriptor.shape)
-		cv2.imshow('asd',descriptor.reshape((324,396)))
-		cv2.waitKey()
-		return hog"""
+		keyPts=[]
+		for iss,jss in zip(ipt_storage,jpt_storage):
+			temp=cv2.KeyPoint()
+			temp.pt=(np.average(np.array(jss)),np.average(np.array(iss)))
+			keyPts.append(temp)
+		return keyPts
