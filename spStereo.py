@@ -4,13 +4,13 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from cv2.ximgproc import createSuperpixelSLIC as SLIC
+from math import ceil
 class SuperPixelStereo:
 	def __init__(self):
 		self.Init = False
 
 	def initialize(self,im):
-		self.height,self.width,self.channels = im.shape
-		self.seeds = cv2.ximgproc.createSuperpixelSEEDS(self.width,self.height,self.channels, 100, 4,5,5)
+		self.Height,self.Width,self.Channels = im.shape
 		#self.slic = cv2.ximgproc.createSuperpixelSLIC(converted,algorithm+SLIC,region_size,float(ruler))
 		self.Init = True
 
@@ -18,19 +18,33 @@ class SuperPixelStereo:
 		if ~self.Init:
 			self.initialize(imL)
 			print("init")
-		labelsL,labelsR=self.segmentImageSLIC(imL,imR)
+		n_lines=10
+		row_idxs=range(self.Height)
+		cs=int(ceil(self.Height/n_lines))
+		chunks=[row_idxs[i:i+cs] for i in range(0, len(row_idxs), cs)]
+		vis_img=np.empty((self.Height,self.Width*2,self.Channels))
+		for chunk in chunks:
+			st=time.time()
+			vis_img[chunk,:]=self.getDisparityLine(imL[chunk,:],imR[chunk,:])
+			print("CYCLE TIME: "+str(time.time()-st))
+
+		plt.imshow(vis_img),plt.show()
+
+	def getDisparityLine(self,imL,imR):
+		self.height,self.width,self.channels = imL.shape
+		self.seeds = cv2.ximgproc.createSuperpixelSEEDS(self.width,self.height,self.channels, 100, 4,5,5)
+		labelsL,labelsR=self.segmentImageSEEDS(imL,imR)
 		hogL,chL=self.getDescriptors(imL,labelsL)
 		hogR,chR=self.getDescriptors(imR,labelsR)
-		print(hogL.shape,chL.shape)
 		#desL=np.concatenate((hogL,chL/10),axis=1).astype(np.uint8)
 		#desR=np.concatenate((hogR,chR/10),axis=1).astype(np.uint8)
-		desL=hogL.astype(np.uint8)
-		desR=hogR.astype(np.uint8)
+		desL=chL.astype(np.uint8)
+		desR=chR.astype(np.uint8)
 		kp1=self.getPixelCentroid(labelsL)
 		kp2=self.getPixelCentroid(labelsR)
-		self.getPixelCentroid(labelsL)
+		#self.getPixelCentroid(labelsL)
 		# create BFMatcher object
-		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
 		# Match descriptors.
 		matches = bf.match(desL,desR)
 		#print(matches[11].trainIdx)
@@ -38,7 +52,7 @@ class SuperPixelStereo:
 		matches = sorted(matches, key = lambda x:x.distance)
 		# Draw first 10 matches.
 		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,matches,None)
-		plt.imshow(img3),plt.show()
+		return img3
 
 	def segmentImageSLIC(self,imL,imR):
 		smoothness=300.0
@@ -107,21 +121,12 @@ class SuperPixelStereo:
 		Bin_size=[17, 4, 4]
 		ch=np.empty((self.NSP,np.prod(Bin_size)))
 		for label in range(self.NSP):
-			#Mask=np.equal(label,labels)
-			#Mask=np.repeat(Mask[:, :, np.newaxis], 3, axis=2)
-			#segment=np.ma.array(img, mask = Mask)
 			Mask=np.array(np.equal(label,labels),dtype=np.uint8)
-			#segment=cv2.bitwise_and(img,img,mask = Mask)
-			#segment=np.compress(Mask.flatten(),img.flatten())
-			#segment=np.ma.masked_less_equal(segment,0)
 			ch[label,:] = cv2.calcHist([hsvim], [0, 1, 2], Mask, Bin_size, [0, 180, 0, 255, 0, 255]).ravel()	
-			#print(h.flatten())
-			#cv2.imshow('asd',hsvim)
-			#cv2.waitKey()
-			#hog=cv2.calcHist([hsvim], [0, 1, 2], Mask, [10, 4, 4], [0, 180, 0, 255, 0, 255])
+
 
 		print("Descriptor Time: "+str(time.time()-st))
-		return ch,hog
+		return hog,ch
 
 	def getOG(self,img):
 		st=time.time()
@@ -142,12 +147,13 @@ class SuperPixelStereo:
 		HOG=np.zeros((self.NSP,n_bins))
 		indx=np.mgrid[0:5,0:5]
 		Bins=np.rint(np.divide(angle.ravel(),dBin)).astype(np.uint8)
-		for m,a,l,b in zip(mag.ravel(),angle.ravel(),labels.ravel(),Bins):
-			HOG[l,b]+=a
+		#for m,a,l,b in zip(mag.ravel(),angle.ravel(),labels.ravel(),Bins):
+			#HOG[l,b]+=a
 		print("HOG Time: "+str(time.time()-st))
 		return HOG
 
 	def getPixelCentroid(self,labels):
+		st=time.time()
 		nx, ny = (self.height, self.width)
 		x = np.linspace(0, 1, nx)
 		y = np.linspace(0, 1, ny)
@@ -164,4 +170,5 @@ class SuperPixelStereo:
 			temp=cv2.KeyPoint()
 			temp.pt=(np.average(np.array(jss)),np.average(np.array(iss)))
 			keyPts.append(temp)
+		print("Centroid Time: "+str(time.time()-st))
 		return keyPts
