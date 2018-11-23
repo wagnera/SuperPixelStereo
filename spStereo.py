@@ -4,7 +4,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from cv2.ximgproc import createSuperpixelSLIC as SLIC
-from matching import SPMatcher
+from graphMatching import SPMatcher
 from math import ceil
 
 class SuperPixelStereo:
@@ -27,8 +27,8 @@ class SuperPixelStereo:
 		chL,hogL=self.getDescriptors(imL,labelsL)
 		chR,hogR=self.getDescriptors(imR,labelsR)
 		print(hogL.shape,chL.shape,ijL.shape)
-		desL=np.concatenate((ijL,chL,hogL),axis=1).astype(np.uint16)
-		desR=np.concatenate((ijR,chR,hogR),axis=1).astype(np.uint16)
+		desL=np.concatenate((ijL,chL,hogL),axis=1)#.astype(np.uint16)
+		desR=np.concatenate((ijR,chR,hogR),axis=1)#.astype(np.uint16)
 		#desL=hogL.astype(np.uint8)
 		#desR=hogR.astype(np.uint8)
 		#print(desL[1,:],desL[2,:])
@@ -53,6 +53,7 @@ class SuperPixelStereo:
 		dispL=self.match2Disparity(labelsL,labelsR,desL,desR,matches)
 		cv2.imwrite('Matches.png',img3)
 		cv2.imwrite('LeftDisp.png',dispL)
+		return dispL
 		#plt.imshow(dispL),plt.show()
 		#plt.imshow(img3),plt.show()
 
@@ -66,7 +67,7 @@ class SuperPixelStereo:
 
 	def segmentImageSLIC(self,imL,imR):
 		smoothness=50.0
-		size=25
+		size=30
 
 		st=time.time()
 		imLLAB = cv2.cvtColor(imL, cv2.COLOR_BGR2LAB)
@@ -80,8 +81,8 @@ class SuperPixelStereo:
 		mask_inv = cv2.bitwise_not(mask)
 		result_bg = cv2.bitwise_and(imL, imL, mask=mask_inv)
 		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
-		markedL = cv2.add(result_bg, result_fg)
-		self.markedL=cv2.cvtColor(markedL,cv2.COLOR_BGR2RGB)
+		self.markedL = cv2.add(result_bg, result_fg)
+		#self.markedL=cv2.cvtColor(markedL,cv2.COLOR_BGR2RGB)
 
 		imRLAB = cv2.cvtColor(imR, cv2.COLOR_BGR2LAB)
 		slR=SLIC(imRLAB,region_size=size,ruler=smoothness,algorithm=101)
@@ -92,8 +93,8 @@ class SuperPixelStereo:
 		mask_inv = cv2.bitwise_not(mask)
 		result_bg = cv2.bitwise_and(imR, imR, mask=mask_inv)
 		result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
-		markedR = cv2.add(result_bg, result_fg)
-		self.markedR=cv2.cvtColor(markedR,cv2.COLOR_BGR2RGB)
+		self.markedR = cv2.add(result_bg, result_fg)
+		#self.markedR=cv2.cvtColor(markedR,cv2.COLOR_BGR2RGB)
 		print("Segmentation Time: "+str(time.time()-st))
 		if leftSP != rightSP:
 			print("ERROR: Number of superpixels do not match")
@@ -134,7 +135,7 @@ class SuperPixelStereo:
 		mag,angle=self.getOG(img)
 		hog=self.getHOG(mag,angle,labels)
 		hsvim = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-		Bin_size=[32, 2, 2]
+		Bin_size=[32, 4, 4]
 		ch=np.empty((self.NSP,np.prod(Bin_size)))
 		for label in range(self.NSP):
 			#Mask=np.equal(label,labels)
@@ -167,7 +168,7 @@ class SuperPixelStereo:
 
 	def getHOG(self,mag,angle,labels):
 		st=time.time()
-		n_bins=32
+		n_bins=64
 		dBin=365.0/(n_bins-1)
 		HOG=np.zeros((self.NSP,n_bins))
 		indx=np.mgrid[0:5,0:5]
@@ -203,27 +204,35 @@ class SuperPixelStereo:
 
 	def matchSP(self,des1,des2):
 		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-		n_lines=15
+		graph_matcher=SPMatcher()
+		n_lines=20
 		row_idxs=range(self.height)
 		cs=int(ceil(self.height/n_lines))
 		chunks=[row_idxs[i:i+cs] for i in range(0, len(row_idxs), cs)]
 		matches=[]
 		for chunk in chunks:
-			des1_inRow=np.where(np.isin(des1[:,1],np.array(chunk)))
+			#des1_inRow=np.where(np.isin(des1[:,1],np.array(chunk)))
+			des1_inRow=np.where(np.logical_and(des1[:,1]>=chunk[0], des1[:,1]<=chunk[-1]))
 			des1_temp=des1[des1_inRow]
-			des2_inRow=np.where(np.isin(des2[:,1],np.array(chunk)))
+			#des2_inRow=np.where(np.isin(des2[:,1],np.array(chunk)))
+			des2_inRow=np.where(np.logical_and(des2[:,1]>=chunk[0], des2[:,1]<=chunk[-1]))
 			des2_temp=des2[des2_inRow]
 			des1_temp[:,0:2]=des1_temp[:,0:2]/5 #since bf matcher only works with uint8 ij coords must be normalized
 			des2_temp[:,0:2]=des2_temp[:,0:2]/5 #5 should be changed for image widths greater than 1280
 			matches_temp = bf.match(des1_temp.astype(np.uint8),des2_temp.astype(np.uint8))
+			#matchess=graph_matcher.find_path(des1_temp.astype(np.uint8),des2_temp.astype(np.uint8))
+			#print("Matches custom: "+ str(matchess))
 			#print(np.sum(np.isin(des1[:,1],np.array(chunk))))
 			matches_to_extend=[]
-			O1=des1_inRow[0][0]
-			O2=des2_inRow[0][0]
+			O1=des1_inRow[0]
+			O2=des2_inRow[0]
+			#print("Length:   ",len(O1),len(O2))
 			for match in matches_temp:
 				global_match=match
-				global_match.queryIdx+=O1
-				global_match.trainIdx+=O2
+				#print(global_match.queryIdx,global_match.trainIdx,O1,O2)
+				global_match.queryIdx=O1[match.queryIdx]
+				global_match.trainIdx=O2[match.trainIdx]
+				#print(global_match.queryIdx,global_match.trainIdx)
 				matches_to_extend.append(global_match)
 			matches.extend(matches_to_extend)
 		return matches
@@ -234,6 +243,7 @@ class SuperPixelStereo:
 			SP1=des1[match.queryIdx,0]
 			SP2=des2[match.trainIdx,0]
 			disp=abs(SP1-SP2)
-			np.putmask(dispImg,np.equal(match.queryIdx,labels1),disp)
+			#print(SP1,SP2,int(disp))
+			np.putmask(dispImg,np.equal(match.queryIdx,labels1),int(disp))
 		return dispImg
 
