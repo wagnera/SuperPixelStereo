@@ -38,8 +38,14 @@ class SPMatcher:
 		#dist_dict=np.array(dist_dict)
 		matches=[]
 		unmatched=range(self.Nsp)
-		print("Matches:" + str(dist_dict[:][0][0][0]))
-		#while len(unmatched) != 0:
-		#	temp_matches=
-		#	u, indices = np.unique(a, return_index=True)
+		temp_matches=[[i, dist_dict[i][0][0]] for i in unmatched]
+		print("Actuals Matches: " + str(temp_matches))
+		temp_matches=[dist_dict[i][0][0] for i in unmatched]
+		u, indices = np.unique(temp_matches, return_index=True)
+		#print(u,indices)
+		to_append=[[i,j] for i,j in zip(indices,u)]
+		print("Funny match: "+ str(to_append))
+		"""while len(unmatched) != 0:
+			temp_matches=
+			u, indices = np.unique(a, return_index=True)"""
 
