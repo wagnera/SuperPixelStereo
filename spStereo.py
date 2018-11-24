@@ -4,7 +4,8 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from cv2.ximgproc import createSuperpixelSLIC as SLIC
-from graphMatching import SPMatcher
+#from graphMatching import SPMatcher
+from matching import SPMatcher
 from math import ceil
 
 class SuperPixelStereo:
@@ -39,7 +40,10 @@ class SuperPixelStereo:
 		#plt.imshow(labelsL/6),plt.show()
 		#plt.imshow(labelsR/6),plt.show()
 		matches =self.matchSP(desL,desR)
-
+		matcher=SPMatcher()
+		st=time.time()
+		matcher.match(desL,desR)
+		print("Distance time: " + str(time.time()-st))
 		# create BFMatcher object
 		#bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
 		# Match descriptors.
@@ -48,12 +52,15 @@ class SuperPixelStereo:
 		# Sort them in the order of their distance.
 		#matches = sorted(matches, key = lambda x:x.distance)
 		# Draw first 10 matches.
-		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,np.random.choice(matches,20),None)
+
+
+		"""img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,np.random.choice(matches,20),None)
 		#plt.imshow(img3),plt.show()
 		dispL=self.match2Disparity(labelsL,labelsR,desL,desR,matches)
 		cv2.imwrite('Matches.png',img3)
 		cv2.imwrite('LeftDisp.png',dispL)
-		return dispL
+		return dispL"""
+
 		#plt.imshow(dispL),plt.show()
 		#plt.imshow(img3),plt.show()
 
@@ -204,8 +211,8 @@ class SuperPixelStereo:
 
 	def matchSP(self,des1,des2):
 		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-		graph_matcher=SPMatcher()
-		n_lines=20
+		matcher=SPMatcher()
+		n_lines=15
 		row_idxs=range(self.height)
 		cs=int(ceil(self.height/n_lines))
 		chunks=[row_idxs[i:i+cs] for i in range(0, len(row_idxs), cs)]
@@ -221,6 +228,7 @@ class SuperPixelStereo:
 			des2_temp[:,0:2]=des2_temp[:,0:2]/5 #5 should be changed for image widths greater than 1280
 			matches_temp = bf.match(des1_temp.astype(np.uint8),des2_temp.astype(np.uint8))
 			#matchess=graph_matcher.find_path(des1_temp.astype(np.uint8),des2_temp.astype(np.uint8))
+			matcher.match(des1_temp,des2_temp)
 			#print("Matches custom: "+ str(matchess))
 			#print(np.sum(np.isin(des1[:,1],np.array(chunk))))
 			matches_to_extend=[]
