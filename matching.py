@@ -56,17 +56,22 @@ class SPMatcher:
 		matches.extend(to_append)
 		print("After: ",len(matches),len(unmatched))
 		#print("Funny match: "+ str(to_append))
-		for unmatch in unmatched:
-			pass
+		
+		#resolve duplicate best matches
+		u=uu[counts!=1]
+		indices=indice[counts!=1]
 		#while len(unmatched) != 0:
-		current_sp=unmatched[0]
-		matches_to_test=np.where(temp_matches==dist_dict[current_sp][0][0])[0]
-		winner=matches_to_test[np.argmin([dist_dict[i][0][1] for i in matches_to_test])]
-		#print(current_sp,unmatched[:5],temp_matches[:5],[dist_dict[i][0][1] for i in matches_to_test], winner,temp_matches[winner])
-		print("Before",len(matches),len(unmatched))
-		unmatched.pop(unmatched.index(winner))
-		matches.append([winner,temp_matches[winner]])
-		print("After: ",len(matches),len(unmatched))
+		for dm in u:
+			matches_to_test=np.where(temp_matches==dm)[0]
+			winner=matches_to_test[np.argmin([dist_dict[i][0][1] for i in matches_to_test])]
+			print(dm,matches_to_test)
+			#print("Before",len(matches),len(unmatched))
+			unmatched.pop(unmatched.index(winner))
+			matches.append([winner,temp_matches[winner]])
+			print([winner,temp_matches[winner]])
+			#print("After: ",len(matches),len(unmatched))
+
+
 		#Covert to opencv match type
 		dmatches=[]
 		for match in matches:
