@@ -2,7 +2,7 @@ import numpy as np
 from math import sqrt
 import time
 import cv2
-
+from copy import deepcopy as DC
 def matchDistance(des1,des2):
 	print(des1.shape,des2.shape)
 	Dij=sqrt((des1[0]-des2[0])**2)+sqrt((des1[1]-des2[1])**2)
@@ -43,33 +43,40 @@ class SPMatcher:
 		matches=[]
 		check_matched={i:False for i in range(self.Nsp)}
 		unmatched=range(self.Nsp)
-		temp_matches=np.array([dist_dict[i][0][0] for i in unmatched])
-		uu, indice, counts = np.unique(temp_matches, return_index=True,return_counts=True)
-		u=uu[counts==1]
-		indices=indice[counts==1]
-		to_append=[[i,j] for i,j in zip(indices,u)]
-		print("Before",len(matches),len(unmatched))
-		#[unmatched.pop(unmatched.index(i)) for i in indices]
-		for i in indices:
-			check_matched[i]=True
-			unmatched.pop(unmatched.index(i))
-		matches.extend(to_append)
-		print("After: ",len(matches),len(unmatched))
-		#print("Funny match: "+ str(to_append))
-		
-		#resolve duplicate best matches
-		u=uu[counts!=1]
-		indices=indice[counts!=1]
-		#while len(unmatched) != 0:
-		for dm in u:
-			matches_to_test=np.where(temp_matches==dm)[0]
-			winner=matches_to_test[np.argmin([dist_dict[i][0][1] for i in matches_to_test])]
-			print(dm,matches_to_test)
-			#print("Before",len(matches),len(unmatched))
-			unmatched.pop(unmatched.index(winner))
-			matches.append([winner,temp_matches[winner]])
-			print([winner,temp_matches[winner]])
-			#print("After: ",len(matches),len(unmatched))
+		level=0
+		while len(unmatched) != 0:
+			unmatched_entering=DC(unmatched)
+			print("Level: " + str(level)+ " Unmatched: " + str(len(unmatched)))
+			temp_matches=np.array([dist_dict[i][level][0] for i in unmatched])
+			uu, indice, counts = np.unique(temp_matches, return_index=True,return_counts=True)
+			u=uu[counts==1]
+			indices=np.array(unmatched)[indice[counts==1]]
+			to_append=[[i,j] for i,j in zip(indices,u)]
+			print("Before",len(matches),len(unmatched))
+			#[unmatched.pop(unmatched.index(i)) for i in indices]
+			for i in indices:
+				#print(len(indices),indices)
+				check_matched[i]=True
+				unmatched.pop(unmatched.index(i))
+			matches.extend(to_append)
+			print("After: ",len(matches),len(unmatched))
+			#print("Funny match: "+ str(to_append))
+			
+			#resolve duplicate best matches
+			u=uu[counts!=1]
+			indices=np.array(unmatched_entering)[indice[counts!=1]]
+			for dm in u:
+				matches_to_test=np.array(unmatched_entering)[temp_matches==dm]##
+				min_idx=np.argmin([dist_dict[i][level][1] for i in matches_to_test])
+				winner=matches_to_test[min_idx]
+				winner_idx=np.where(temp_matches==dm)[0][min_idx]
+				print(dm,matches_to_test)
+				#print("Before",len(matches),len(unmatched))
+				unmatched.pop(unmatched.index(winner))
+				matches.append([winner,temp_matches[winner_idx]])
+				print([winner,temp_matches[winner_idx]])
+				#print("After: ",len(matches),len(unmatched))
+			level += 1
 
 
 		#Covert to opencv match type
