@@ -7,6 +7,7 @@ from cv2.ximgproc import createSuperpixelSLIC as SLIC
 #from graphMatching import SPMatcher
 from matching import SPMatcher
 from math import ceil
+from graph_cut_match import GCMatcher
 
 class SuperPixelStereo:
 	def __init__(self):
@@ -22,7 +23,11 @@ class SuperPixelStereo:
 		if ~self.Init:
 			self.initialize(imL)
 			print("init")
-		labelsL,labelsR=self.segmentImageSLIC(imL,imR)
+		#labelsL,labelsR=self.segmentImageSLIC(imL,imR)
+		labelsL,labelsR=self.fake_segment(imL,imR)
+		cv2.imwrite('LabelsL.png',(labelsL)/32*6)
+		cv2.imwrite('LabelR.png',(labelsR)/32*6)
+		print(np.unique(labelsL).shape,np.unique(labelsR).shape)
 		kp1,ijL=self.getPixelCentroid(labelsL)
 		kp2,ijR=self.getPixelCentroid(labelsR)
 		chL,hogL=self.getDescriptors(imL,labelsL)
@@ -30,51 +35,31 @@ class SuperPixelStereo:
 		print(hogL.shape,chL.shape,ijL.shape)
 		desL=np.concatenate((ijL,chL,hogL),axis=1)#.astype(np.uint16)
 		desR=np.concatenate((ijR,chR,hogR),axis=1)#.astype(np.uint16)
+		np.save('desLeft',desL)
+		np.save('desRight',desR)
+		np.save('labelsLeft',labelsL)
 		#desL=hogL.astype(np.uint8)
 		#desR=hogR.astype(np.uint8)
 		#print(desL[1,:],desL[2,:])
-		self.getPixelCentroid(labelsL)
-		#st=time.time()
-		#SPMatcher(desL,desR)
-		#print("Matching time: ",time.time()-st)
-		#plt.imshow(labelsL/6),plt.show()
-		#plt.imshow(labelsR/6),plt.show()
-		#matches =self.matchSP(desL,desR)
-		matcher=SPMatcher()
-		st=time.time()
-		matches=matcher.match(desL,desR)
-		print("Distance time: " + str(time.time()-st))
-		# create BFMatcher object
-		#bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-		# Match descriptors.
-		#matches = bf.match(desL,desR)
-		#print(matches[11].trainIdx)
-		# Sort them in the order of their distance.
-		#matches = sorted(matches, key = lambda x:x.distance)
-		# Draw first 10 matches.
+		#self.getPixelCentroid(labelsL)
+		gcmatcher=GCMatcher()
+		gcmatcher.match(desL,desR,labelsL)
 
-
-		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,np.random.choice(matches,20),None)
-		#plt.imshow(img3),plt.show()
-		dispL=self.match2Disparity(labelsL,labelsR,desL,desR,matches)
-		cv2.imwrite('Matches.png',img3)
-		cv2.imwrite('LeftDisp.png',dispL)
-		return dispL
-
-		#plt.imshow(dispL),plt.show()
-		#plt.imshow(img3),plt.show()
-
-		"""matches = bf.match(desR,desL)
-		#print(matches[11].trainIdx)
-		# Sort them in the order of their distance.
-		matches = sorted(matches, key = lambda x:x.distance)
-		# Draw first 10 matches.
-		img3 = cv2.drawMatches(self.markedR,kp2,self.markedL,kp1,np.random.choice(matches,20),None)
-		#plt.imshow(img3),plt.show()"""
+	def fake_segment(self,imL,imR):
+		labels=np.zeros((self.height,self.width),dtype=int)
+		self.NSP=32*18
+		dw=self.width/32
+		dh=self.height/18
+		for i in range(self.height):
+			for j in range(self.width):
+				r=int(round(i/dh))
+				c=int(round(j/dw))
+				labels[i,j]=r*32+c
+		return labels,labels
 
 	def segmentImageSLIC(self,imL,imR):
-		smoothness=50.0
-		size=30
+		smoothness=200.0
+		size=40
 
 		st=time.time()
 		imLLAB = cv2.cvtColor(imL, cv2.COLOR_BGR2LAB)
@@ -142,7 +127,7 @@ class SuperPixelStereo:
 		mag,angle=self.getOG(img)
 		hog=self.getHOG(mag,angle,labels)
 		hsvim = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-		Bin_size=[32, 4, 4]
+		Bin_size=[16, 2, 2]
 		ch=np.empty((self.NSP,np.prod(Bin_size)))
 		for label in range(self.NSP):
 			#Mask=np.equal(label,labels)
@@ -175,7 +160,7 @@ class SuperPixelStereo:
 
 	def getHOG(self,mag,angle,labels):
 		st=time.time()
-		n_bins=64
+		n_bins=32
 		dBin=365.0/(n_bins-1)
 		HOG=np.zeros((self.NSP,n_bins))
 		indx=np.mgrid[0:5,0:5]
@@ -212,7 +197,7 @@ class SuperPixelStereo:
 	def matchSP(self,des1,des2):
 		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
 		matcher=SPMatcher()
-		n_lines=15
+		n_lines=17
 		row_idxs=range(self.height)
 		cs=int(ceil(self.height/n_lines))
 		chunks=[row_idxs[i:i+cs] for i in range(0, len(row_idxs), cs)]
