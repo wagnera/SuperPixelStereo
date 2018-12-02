@@ -15,7 +15,7 @@ def matchDistance(des1,des2):
 
 class GCMatcher:
 	def __init__(self):
-		self.Ndisp=128
+		self.Ndisp=256
 		self.nRow=18
 		self.nCol=32
 
@@ -31,7 +31,7 @@ class GCMatcher:
 			Dj=abs(np.subtract(des2[:,1],row[:,1]))
 			Dfeat=np.linalg.norm(np.subtract(des2[:,2:],row[:,2:]),axis=1)
 			#Dists.append(np.power(4*Di+Dj,2)+Dfeat)
-			Dists.append(Dfeat+Dj)
+			Dists.append(Dfeat+Dj*100)
 			disps.append(Di)
 			#break #remove
 		Dists=np.array(Dists)
@@ -43,10 +43,11 @@ class GCMatcher:
 		print(disps.shape)
 		D=np.empty((self.nCol,self.nRow,self.Ndisp))
 		for row,distrow,i in zip(disps,Dists,range(self.Nsp)):
-			D_row=np.ones(self.Ndisp)*100000
+			D_row=np.ones(self.Ndisp)*1000000
+			min_dist=min(distrow)
 			for disparity,dist in zip(row,distrow):
-				if disparity < self.Ndisp and D_row[disparity] > dist:
-					D_row[disparity]=50*(dist/1000.0)**5
+				if disparity > -1 and disparity < self.Ndisp and D_row[disparity] > dist:
+					D_row[disparity]=dist/min_dist#(dist/min_dist)**2+1
 			#print(i%self.nCol,i/self.nCol,i)
 			D[i%self.nCol,i/self.nCol,:]=D_row
 		return D
@@ -55,7 +56,7 @@ class GCMatcher:
 		V=np.zeros((self.Ndisp,self.Ndisp))
 		for row,i in zip(V,range(self.Ndisp)):
 			for col,j in zip(row,range(self.Ndisp)):
-				V[i,j]=min(abs(i-j),10)
+				V[i,j]=min(abs(i-j)/100,5000)
 		print(V)
 		return V
 
@@ -68,6 +69,7 @@ class GCMatcher:
 		#print(labels,type(labels))
 		disp_img=self.calcDisparity(labels1,labels)
 		cv2.imwrite('Disp.png',disp_img)
+		return disp_img
 
 	def calcDisparity(self,labels1,gclabels):
 		dispImg=np.zeros((labels1.shape))

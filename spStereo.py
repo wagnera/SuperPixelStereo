@@ -8,6 +8,7 @@ from cv2.ximgproc import createSuperpixelSLIC as SLIC
 from matching import SPMatcher
 from math import ceil
 from graph_cut_match import GCMatcher
+from scipy import signal
 
 class SuperPixelStereo:
 	def __init__(self):
@@ -25,8 +26,8 @@ class SuperPixelStereo:
 			print("init")
 		#labelsL,labelsR=self.segmentImageSLIC(imL,imR)
 		labelsL,labelsR=self.fake_segment(imL,imR)
-		cv2.imwrite('LabelsL.png',(labelsL)/32*6)
-		cv2.imwrite('LabelR.png',(labelsR)/32*6)
+		cv2.imwrite('LabelsL.png',(labelsL)/64*6)
+		cv2.imwrite('LabelR.png',(labelsR)/64*6)
 		print(np.unique(labelsL).shape,np.unique(labelsR).shape)
 		kp1,ijL=self.getPixelCentroid(labelsL)
 		kp2,ijR=self.getPixelCentroid(labelsR)
@@ -43,7 +44,20 @@ class SuperPixelStereo:
 		#print(desL[1,:],desL[2,:])
 		#self.getPixelCentroid(labelsL)
 		gcmatcher=GCMatcher()
-		gcmatcher.match(desL,desR,labelsL)
+		dispLL=gcmatcher.match(desL,desR,labelsL)
+
+		matcher=SPMatcher()
+		st=time.time()
+		#matches=matcher.match(desL,desR)
+		matches=self.matchSP(desL,desR)
+		print("Distance time: " + str(time.time()-st))
+
+		img3 = cv2.drawMatches(imL,kp1,imR,kp2,np.random.choice(matches,20),None)
+		#plt.imshow(img3),plt.show()
+		dispL=self.match2Disparity(labelsL,labelsR,desL,desR,matches)
+		cv2.imwrite('Matches.png',img3)
+		cv2.imwrite('LeftDisp.png',dispL)
+		return dispLL
 
 	def fake_segment(self,imL,imR):
 		labels=np.zeros((self.height,self.width),dtype=int)
@@ -197,7 +211,7 @@ class SuperPixelStereo:
 	def matchSP(self,des1,des2):
 		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
 		matcher=SPMatcher()
-		n_lines=17
+		n_lines=18
 		row_idxs=range(self.height)
 		cs=int(ceil(self.height/n_lines))
 		chunks=[row_idxs[i:i+cs] for i in range(0, len(row_idxs), cs)]
