@@ -25,40 +25,40 @@ class SuperPixelStereo:
 			self.initialize(imL)
 			print("init")
 			print(self.height,self.width,imL.shape)
-		#labelsL,labelsR=self.segmentImageSLIC(imL,imR)
-		self.nCol=15
-		self.nRow=15
-		labelsL,labelsR=self.fake_segment(imL,imR)
+		labelsL,labelsR=self.segmentImageSLIC(imL,imR)
 		kp1,ijL=self.getPixelCentroid(labelsL)
 		kp2,ijR=self.getPixelCentroid(labelsR)
 		imLg=cv2.cvtColor(imL,cv2.COLOR_BGR2GRAY)
-		cv2.imwrite('leftgray.png',imLg)
 		imRg=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
 		gt_disp=cv2.imread('dataset/middleburyLeftdisp.png',0)
-		#gt_disp=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
 		#######################
 		dispImg=np.zeros((labelsL.shape))
-		dw=self.width/self.nCol
-		dh=self.height/self.nRow
-		for i in range(self.nRow):
-			row_img=imRg[tuple(range(dh*i,dh*i+dh)),:].astype(float)
-			#cv2.imwrite('sdadas.png',row_img)
-			for j in range(self.nCol):
-				c=int(round(j/dw))
-				patch=imLg[dh*i:dh*i+dh,dw*j:dw*j+dw].astype(float)
-				row_img = (row_img - np.mean(row_img)) / (np.std(row_img) * row_img.size)
-				patch = (patch - np.mean(patch)) / (np.std(patch))
-				#cv2.imwrite('sdadas.png',row_img)
+		Js,Is=np.meshgrid(range(self.width),range(self.height))
+		for sp in range(self.NSP):
+			print("Processing SP: "+str(sp)+" of "+str(self.NSP))
+			mask=labelsL==sp
+			imin=np.amin(Is[mask])
+			jmin=np.amin(Js[mask])
+			imax=np.amax(Is[mask])
+			jmax=np.amax(Js[mask])
+			row_img=imR[imin:imax,:].astype(float)
+			patch=imL[imin:imax,jmin:jmax].astype(float)
+			row_img = (row_img - np.mean(row_img)) / (np.std(row_img) * row_img.size)
+			patch = (patch - np.mean(patch)) / (np.std(patch))
+			try:
 				test=match_template(row_img, patch)
-				#print(abs(np.argmax(test)-j*dw))
-				#print(test[0])
-				#plt.plot(test[0])
-				#plt.show()
-				np.putmask(dispImg,np.equal(i*self.nCol+j,labelsL),int(abs(np.argmax(test[0])-j*dw)))
+			except:
+				print("Problem in match")
+				print(jmin,jmax,imin,imax)
+				continue
+			#print(int(abs(np.argmax(test[0])-ijL[sp][0])),jmin,jmax,imin,imax,ijL[sp][0],np.argmax(test[0]))
+			#exit()
+			print((self.width-test.shape[1])/2)
+			np.putmask(dispImg,mask,int(abs(np.argmax(test[0])-ijL[sp][0])-((self.width-test.shape[1])/2)))
 		cv2.imwrite('Disp32.png',dispImg*4)
 		cv2.imwrite('Disp32_filter.png',signal.medfilt(dispImg*4))
-		plt.plot(dispImg[10,:])
-		plt.plot(gt_disp[10*self.nRow,:]/4)
+		plt.plot(dispImg[100,:])
+		plt.plot(gt_disp[100,:]/4)
 		plt.legend(['Calculated', 'ground truth'], loc='upper left')
 		plt.show()
 		#######################
@@ -118,8 +118,8 @@ class SuperPixelStereo:
 		return labels,labels
 
 	def segmentImageSLIC(self,imL,imR):
-		smoothness=50.0
-		size=30
+		smoothness=100.0
+		size=20
 
 		st=time.time()
 		imLLAB = cv2.cvtColor(imL, cv2.COLOR_BGR2LAB)
