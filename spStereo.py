@@ -57,10 +57,10 @@ class SuperPixelStereo:
 			np.putmask(dispImg,mask,int(abs(np.argmax(test[0])-ijL[sp][0])-((self.width-test.shape[1])/2)))
 		cv2.imwrite('Disp32.png',dispImg*4)
 		cv2.imwrite('Disp32_filter.png',signal.medfilt(dispImg*4))
-		plt.plot(dispImg[100,:])
-		plt.plot(gt_disp[100,:]/4)
-		plt.legend(['Calculated', 'ground truth'], loc='upper left')
-		plt.show()
+		#plt.plot(dispImg[100,:])
+		#plt.plot(gt_disp[100,:]/4)
+		#plt.legend(['Calculated', 'ground truth'], loc='upper left')
+		#plt.show()
 		#######################
 		"""dispImg2=np.zeros((imLg.shape))
 		half_wind=3
