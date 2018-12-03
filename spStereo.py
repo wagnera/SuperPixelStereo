@@ -28,14 +28,14 @@ class SuperPixelStereo:
 		#labelsL,labelsR=self.segmentImageSLIC(imL,imR)
 		self.nCol=15
 		self.nRow=15
-		labelsL,labelsR=self.fake_segment(imL,imR)
-		kp1,ijL=self.getPixelCentroid(labelsL)
-		kp2,ijR=self.getPixelCentroid(labelsR)
+		#labelsL,labelsR=self.fake_segment(imL,imR)
+		#kp1,ijL=self.getPixelCentroid(labelsL)
+		#kp2,ijR=self.getPixelCentroid(labelsR)
 		imLg=cv2.cvtColor(imL,cv2.COLOR_BGR2GRAY)
-		cv2.imwrite('leftgray.png',imLg)
+		#cv2.imwrite('leftgray.png',imLg)
 		imRg=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
 		gt_disp=cv2.imread('dataset/middleburyLeftdisp.png',0)
-		#gt_disp=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
+		"""#gt_disp=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
 		#######################
 		dispImg=np.zeros((labelsL.shape))
 		dw=self.width/self.nCol
@@ -60,9 +60,9 @@ class SuperPixelStereo:
 		plt.plot(dispImg[10,:])
 		plt.plot(gt_disp[10*self.nRow,:]/4)
 		plt.legend(['Calculated', 'ground truth'], loc='upper left')
-		plt.show()
+		plt.show()"""
 		#######################
-		"""dispImg2=np.zeros((imLg.shape))
+		dispImg2=np.zeros((imLg.shape))
 		half_wind=3
 		for i in range(half_wind,self.height-half_wind):
 			print(i)
@@ -83,26 +83,26 @@ class SuperPixelStereo:
 					#test=signal.correlate2d(imLg_norm, patch_norm, mode='valid')
 					#cv2.imwrite('cc_img.png',test)
 					#exit()
-					print(np.mean(row_img),np.std(row_img))
-					imRg[i-half_wind:i+half_wind,:]=255
-					imLg[i-half_wind:i+half_wind,j-half_wind:j+half_wind]=255
-					cv2.imwrite('patch.png',patch)
-					cv2.imwrite('row_img.png',row_img)
-					print(j,np.argmax(test[0]),int(abs(np.argmax(test[0])-j)),gt_disp[i,j])
-					plt.plot(test[0])
-					plt.show()
+					#print(np.mean(row_img),np.std(row_img))
+					#imRg[i-half_wind:i+half_wind,:]=255
+					#imLg[i-half_wind:i+half_wind,j-half_wind:j+half_wind]=255
+					#cv2.imwrite('patch.png',patch)
+					#cv2.imwrite('row_img.png',row_img)
+					#print(j,np.argmax(test[0]),int(abs(np.argmax(test[0])-j)),gt_disp[i,j])
+					#plt.plot(test[0])
+					#plt.show()
 				#np.putmask(dispImg2,np.equal(i*self.nCol+j,labelsL),int(abs(np.argmax(test[0])-j*dw)/5))
 				dispImg2[i,j]=int(abs(np.argmax(test[0])-j+half_wind))
 		gt_dispc=cv2.imread('dataset/disp2.png')
 		gt_dispc[100,:,2]=255
 		cv2.imwrite('scanline.png',gt_dispc)
 		cv2.imwrite('DispAll.png',dispImg2*4)
-		cv2.imwrite('DispAll_filter.png',signal.medfilt(dispImg2))
+		cv2.imwrite('DispAll_filter.png',signal.medfilt(dispImg2*4))
 		print(dispImg2.shape,gt_disp.shape)
 		plt.plot(dispImg2[100,:])
 		plt.plot(gt_disp[100,:]/4)
 		plt.legend(['Calculated', 'ground truth'], loc='upper left')
-		plt.show()"""
+		#plt.show()
 
 
 	def fake_segment(self,imL,imR):

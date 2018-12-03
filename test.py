@@ -1,5 +1,6 @@
 from spStereo import SuperPixelStereo as sps
 import cv2
+import time
 a=sps()
 imL=cv2.imread('dataset/middleburyLeft.png')
 imR=cv2.imread('dataset/middleburyRight.png')
@@ -10,8 +11,9 @@ imR=cv2.imread('dataset/middleburyRight.png')
 #imR = cv2.resize(imR,(1280,720))
 #imL = cv2.resize(imL,None,fx=0.5,fy=0.5)
 #imR = cv2.resize(imR,None,fx=0.5,fy=0.5)
+st=time.time()
 a.getDisparity(imL,imR)
-
+print(time.time()-st)
 
 """n_images=6
 st_idx=0
