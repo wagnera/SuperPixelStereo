@@ -26,18 +26,18 @@ class SuperPixelStereo:
 			print("init")
 			print(self.height,self.width,imL.shape)
 		#labelsL,labelsR=self.segmentImageSLIC(imL,imR)
-		self.nCol=32*2
-		self.nRow=18*2
-		"""labelsL,labelsR=self.fake_segment(imL,imR)
+		self.nCol=15
+		self.nRow=15
+		labelsL,labelsR=self.fake_segment(imL,imR)
 		kp1,ijL=self.getPixelCentroid(labelsL)
-		kp2,ijR=self.getPixelCentroid(labelsR)"""
+		kp2,ijR=self.getPixelCentroid(labelsR)
 		imLg=cv2.cvtColor(imL,cv2.COLOR_BGR2GRAY)
 		cv2.imwrite('leftgray.png',imLg)
 		imRg=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
-		gt_disp=cv2.imread('dataset/disp2.png',0)
+		gt_disp=cv2.imread('dataset/middleburyLeftdisp.png',0)
 		#gt_disp=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
 		#######################
-		"""dispImg=np.zeros((labelsL.shape))
+		dispImg=np.zeros((labelsL.shape))
 		dw=self.width/self.nCol
 		dh=self.height/self.nRow
 		for i in range(self.nRow):
@@ -48,16 +48,21 @@ class SuperPixelStereo:
 				patch=imLg[dh*i:dh*i+dh,dw*j:dw*j+dw].astype(float)
 				row_img = (row_img - np.mean(row_img)) / (np.std(row_img) * row_img.size)
 				patch = (patch - np.mean(patch)) / (np.std(patch))
-				cv2.imwrite('sdadas.png',row_img)
-				test=signal.correlate(row_img, patch, mode='valid',method='auto')
+				#cv2.imwrite('sdadas.png',row_img)
+				test=match_template(row_img, patch)
 				#print(abs(np.argmax(test)-j*dw))
 				#print(test[0])
 				#plt.plot(test[0])
 				#plt.show()
-				np.putmask(dispImg,np.equal(i*self.nCol+j,labelsL),int(abs(np.argmax(test[0])-j*dw)/5))
-		cv2.imwrite('Disp32.png',dispImg)"""
+				np.putmask(dispImg,np.equal(i*self.nCol+j,labelsL),int(abs(np.argmax(test[0])-j*dw)))
+		cv2.imwrite('Disp32.png',dispImg*4)
+		cv2.imwrite('Disp32_filter.png',signal.medfilt(dispImg*4))
+		plt.plot(dispImg[10,:])
+		plt.plot(gt_disp[10*self.nRow,:]/4)
+		plt.legend(['Calculated', 'ground truth'], loc='upper left')
+		plt.show()
 		#######################
-		dispImg2=np.zeros((imLg.shape))
+		"""dispImg2=np.zeros((imLg.shape))
 		half_wind=3
 		for i in range(half_wind,self.height-half_wind):
 			print(i)
@@ -75,7 +80,7 @@ class SuperPixelStereo:
 				#print(test[0])
 				if i == 100 and j> 200:
 					pass
-					"""#test=signal.correlate2d(imLg_norm, patch_norm, mode='valid')
+					#test=signal.correlate2d(imLg_norm, patch_norm, mode='valid')
 					#cv2.imwrite('cc_img.png',test)
 					#exit()
 					print(np.mean(row_img),np.std(row_img))
@@ -85,7 +90,7 @@ class SuperPixelStereo:
 					cv2.imwrite('row_img.png',row_img)
 					print(j,np.argmax(test[0]),int(abs(np.argmax(test[0])-j)),gt_disp[i,j])
 					plt.plot(test[0])
-					plt.show()"""
+					plt.show()
 				#np.putmask(dispImg2,np.equal(i*self.nCol+j,labelsL),int(abs(np.argmax(test[0])-j*dw)/5))
 				dispImg2[i,j]=int(abs(np.argmax(test[0])-j+half_wind))
 		gt_dispc=cv2.imread('dataset/disp2.png')
@@ -97,7 +102,7 @@ class SuperPixelStereo:
 		plt.plot(dispImg2[100,:])
 		plt.plot(gt_disp[100,:]/4)
 		plt.legend(['Calculated', 'ground truth'], loc='upper left')
-		plt.show()
+		plt.show()"""
 
 
 	def fake_segment(self,imL,imR):
