@@ -7,6 +7,8 @@ from cv2.ximgproc import createSuperpixelSLIC as SLIC
 #from graphMatching import SPMatcher
 from matching import SPMatcher
 from math import ceil
+from scipy import signal 
+from skimage.feature import match_template
 
 class SuperPixelStereo:
 	def __init__(self):
@@ -22,55 +24,93 @@ class SuperPixelStereo:
 		if ~self.Init:
 			self.initialize(imL)
 			print("init")
-		labelsL,labelsR=self.segmentImageSLIC(imL,imR)
+			print(self.height,self.width,imL.shape)
+		#labelsL,labelsR=self.segmentImageSLIC(imL,imR)
+		self.nCol=32*2
+		self.nRow=18*2
+		"""labelsL,labelsR=self.fake_segment(imL,imR)
 		kp1,ijL=self.getPixelCentroid(labelsL)
-		kp2,ijR=self.getPixelCentroid(labelsR)
-		chL,hogL=self.getDescriptors(imL,labelsL)
-		chR,hogR=self.getDescriptors(imR,labelsR)
-		print(hogL.shape,chL.shape,ijL.shape)
-		desL=np.concatenate((ijL,chL,hogL),axis=1)#.astype(np.uint16)
-		desR=np.concatenate((ijR,chR,hogR),axis=1)#.astype(np.uint16)
-		#desL=hogL.astype(np.uint8)
-		#desR=hogR.astype(np.uint8)
-		#print(desL[1,:],desL[2,:])
-		self.getPixelCentroid(labelsL)
-		#st=time.time()
-		#SPMatcher(desL,desR)
-		#print("Matching time: ",time.time()-st)
-		#plt.imshow(labelsL/6),plt.show()
-		#plt.imshow(labelsR/6),plt.show()
-		#matches =self.matchSP(desL,desR)
-		matcher=SPMatcher()
-		st=time.time()
-		matches=matcher.match(desL,desR)
-		print("Distance time: " + str(time.time()-st))
-		# create BFMatcher object
-		#bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-		# Match descriptors.
-		#matches = bf.match(desL,desR)
-		#print(matches[11].trainIdx)
-		# Sort them in the order of their distance.
-		#matches = sorted(matches, key = lambda x:x.distance)
-		# Draw first 10 matches.
+		kp2,ijR=self.getPixelCentroid(labelsR)"""
+		imLg=cv2.cvtColor(imL,cv2.COLOR_BGR2GRAY)
+		cv2.imwrite('leftgray.png',imLg)
+		imRg=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
+		gt_disp=cv2.imread('dataset/disp2.png',0)
+		#gt_disp=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
+		#######################
+		"""dispImg=np.zeros((labelsL.shape))
+		dw=self.width/self.nCol
+		dh=self.height/self.nRow
+		for i in range(self.nRow):
+			row_img=imRg[tuple(range(dh*i,dh*i+dh)),:].astype(float)
+			#cv2.imwrite('sdadas.png',row_img)
+			for j in range(self.nCol):
+				c=int(round(j/dw))
+				patch=imLg[dh*i:dh*i+dh,dw*j:dw*j+dw].astype(float)
+				row_img = (row_img - np.mean(row_img)) / (np.std(row_img) * row_img.size)
+				patch = (patch - np.mean(patch)) / (np.std(patch))
+				cv2.imwrite('sdadas.png',row_img)
+				test=signal.correlate(row_img, patch, mode='valid',method='auto')
+				#print(abs(np.argmax(test)-j*dw))
+				#print(test[0])
+				#plt.plot(test[0])
+				#plt.show()
+				np.putmask(dispImg,np.equal(i*self.nCol+j,labelsL),int(abs(np.argmax(test[0])-j*dw)/5))
+		cv2.imwrite('Disp32.png',dispImg)"""
+		#######################
+		dispImg2=np.zeros((imLg.shape))
+		half_wind=3
+		for i in range(half_wind,self.height-half_wind):
+			print(i)
+			row_img=imRg[i-half_wind:i+half_wind,:].astype(float)
+			for j in range(half_wind,self.width-half_wind):
+				patch=imLg[i-half_wind:i+half_wind,j-half_wind:j+half_wind].astype(float)
+				row_img_norm = (row_img - np.mean(row_img)) / (np.std(row_img))
+				patch_norm = (patch - np.mean(patch)) / (np.std(patch))
+				#print(row_img.shape, patch.shape)
+				#test=np.array([0,0])#signal.correlate2d(row_img_norm, patch_norm, mode='valid')
+				test=match_template(row_img, patch)
+				#print(test,test.shape)
+				#print(test.shape)
+				#print(abs(np.argmax(test)-j*dw))
+				#print(test[0])
+				if i == 100 and j> 200:
+					pass
+					"""#test=signal.correlate2d(imLg_norm, patch_norm, mode='valid')
+					#cv2.imwrite('cc_img.png',test)
+					#exit()
+					print(np.mean(row_img),np.std(row_img))
+					imRg[i-half_wind:i+half_wind,:]=255
+					imLg[i-half_wind:i+half_wind,j-half_wind:j+half_wind]=255
+					cv2.imwrite('patch.png',patch)
+					cv2.imwrite('row_img.png',row_img)
+					print(j,np.argmax(test[0]),int(abs(np.argmax(test[0])-j)),gt_disp[i,j])
+					plt.plot(test[0])
+					plt.show()"""
+				#np.putmask(dispImg2,np.equal(i*self.nCol+j,labelsL),int(abs(np.argmax(test[0])-j*dw)/5))
+				dispImg2[i,j]=int(abs(np.argmax(test[0])-j+half_wind))
+		gt_dispc=cv2.imread('dataset/disp2.png')
+		gt_dispc[100,:,2]=255
+		cv2.imwrite('scanline.png',gt_dispc)
+		cv2.imwrite('DispAll.png',dispImg2*4)
+		cv2.imwrite('DispAll_filter.png',signal.medfilt(dispImg2))
+		print(dispImg2.shape,gt_disp.shape)
+		plt.plot(dispImg2[100,:])
+		plt.plot(gt_disp[100,:]/4)
+		plt.legend(['Calculated', 'ground truth'], loc='upper left')
+		plt.show()
 
 
-		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,np.random.choice(matches,20),None)
-		#plt.imshow(img3),plt.show()
-		dispL=self.match2Disparity(labelsL,labelsR,desL,desR,matches)
-		cv2.imwrite('Matches.png',img3)
-		cv2.imwrite('LeftDisp.png',dispL)
-		return dispL
-
-		#plt.imshow(dispL),plt.show()
-		#plt.imshow(img3),plt.show()
-
-		"""matches = bf.match(desR,desL)
-		#print(matches[11].trainIdx)
-		# Sort them in the order of their distance.
-		matches = sorted(matches, key = lambda x:x.distance)
-		# Draw first 10 matches.
-		img3 = cv2.drawMatches(self.markedR,kp2,self.markedL,kp1,np.random.choice(matches,20),None)
-		#plt.imshow(img3),plt.show()"""
+	def fake_segment(self,imL,imR):
+		labels=np.zeros((self.height,self.width),dtype=int)
+		self.NSP=self.nCol*self.nRow
+		dw=self.width/self.nCol
+		dh=self.height/self.nRow
+		for i in range(self.height):
+			for j in range(self.width):
+				r=int(round(i/dh))
+				c=int(round(j/dw))
+				labels[i,j]=r*self.nCol+c
+		return labels,labels
 
 	def segmentImageSLIC(self,imL,imR):
 		smoothness=50.0
@@ -137,55 +177,6 @@ class SuperPixelStereo:
 			self.NSP=leftSP
 			return labelsL,labelsR
 
-	def getDescriptors(self,img,labels):
-		st=time.time()
-		mag,angle=self.getOG(img)
-		hog=self.getHOG(mag,angle,labels)
-		hsvim = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-		Bin_size=[32, 4, 4]
-		ch=np.empty((self.NSP,np.prod(Bin_size)))
-		for label in range(self.NSP):
-			#Mask=np.equal(label,labels)
-			#Mask=np.repeat(Mask[:, :, np.newaxis], 3, axis=2)
-			#segment=np.ma.array(img, mask = Mask)
-			Mask=np.array(np.equal(label,labels),dtype=np.uint8)
-			#segment=cv2.bitwise_and(img,img,mask = Mask)
-			#segment=np.compress(Mask.flatten(),img.flatten())
-			#segment=np.ma.masked_less_equal(segment,0)
-			ch[label,:] = cv2.calcHist([hsvim], [0, 1, 2], Mask, Bin_size, [0, 180, 0, 255, 0, 255]).ravel()	
-			#print(h.flatten())
-			#cv2.imshow('asd',hsvim)
-			#cv2.waitKey()
-			#hog=cv2.calcHist([hsvim], [0, 1, 2], Mask, [10, 4, 4], [0, 180, 0, 255, 0, 255])
-
-		print("Descriptor Time: "+str(time.time()-st))
-		return ch,hog
-
-	def getOG(self,img):
-		st=time.time()
-		img = np.float32(img) / 255.0
-
-		# Calculate gradient 
-		gx = cv2.Sobel(img, cv2.CV_32F, 1, 0, ksize=1)
-		gy = cv2.Sobel(img, cv2.CV_32F, 0, 1, ksize=1)
-
-		mag, angle = cv2.cartToPolar(gx, gy, angleInDegrees=True)
-		print("OT Time: "+str(time.time()-st))
-		return mag,angle
-
-	def getHOG(self,mag,angle,labels):
-		st=time.time()
-		n_bins=64
-		dBin=365.0/(n_bins-1)
-		HOG=np.zeros((self.NSP,n_bins))
-		indx=np.mgrid[0:5,0:5]
-		Bins=np.rint(np.divide(angle.ravel(),dBin)).astype(np.uint8)
-		for m,a,l,b in zip(mag.ravel(),angle.ravel(),labels.ravel(),Bins):
-			HOG[l,b]+=a
-		HOG=(HOG/np.amax(HOG))*255
-		print("HOG Time: "+str(time.time()-st))
-		return HOG
-
 	def getPixelCentroid(self,labels):
 		st=time.time()
 		nx, ny = (self.height, self.width)
@@ -208,42 +199,6 @@ class SuperPixelStereo:
 			ijPts.append(np.array(temp.pt))
 		print("Centroid Time: "+str(time.time()-st))
 		return keyPts,np.array(ijPts)
-
-	def matchSP(self,des1,des2):
-		bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-		matcher=SPMatcher()
-		n_lines=15
-		row_idxs=range(self.height)
-		cs=int(ceil(self.height/n_lines))
-		chunks=[row_idxs[i:i+cs] for i in range(0, len(row_idxs), cs)]
-		matches=[]
-		for chunk in chunks:
-			#des1_inRow=np.where(np.isin(des1[:,1],np.array(chunk)))
-			des1_inRow=np.where(np.logical_and(des1[:,1]>=chunk[0], des1[:,1]<=chunk[-1]))
-			des1_temp=des1[des1_inRow]
-			#des2_inRow=np.where(np.isin(des2[:,1],np.array(chunk)))
-			des2_inRow=np.where(np.logical_and(des2[:,1]>=chunk[0], des2[:,1]<=chunk[-1]))
-			des2_temp=des2[des2_inRow]
-			des1_temp[:,0:2]=des1_temp[:,0:2]/5 #since bf matcher only works with uint8 ij coords must be normalized
-			des2_temp[:,0:2]=des2_temp[:,0:2]/5 #5 should be changed for image widths greater than 1280
-			matches_temp = bf.match(des1_temp.astype(np.uint8),des2_temp.astype(np.uint8))
-			#matchess=graph_matcher.find_path(des1_temp.astype(np.uint8),des2_temp.astype(np.uint8))
-			matcher.match(des1_temp,des2_temp)
-			#print("Matches custom: "+ str(matchess))
-			#print(np.sum(np.isin(des1[:,1],np.array(chunk))))
-			matches_to_extend=[]
-			O1=des1_inRow[0]
-			O2=des2_inRow[0]
-			#print("Length:   ",len(O1),len(O2))
-			for match in matches_temp:
-				global_match=match
-				#print(global_match.queryIdx,global_match.trainIdx,O1,O2)
-				global_match.queryIdx=O1[match.queryIdx]
-				global_match.trainIdx=O2[match.trainIdx]
-				#print(global_match.queryIdx,global_match.trainIdx)
-				matches_to_extend.append(global_match)
-			matches.extend(matches_to_extend)
-		return matches
 
 	def match2Disparity(self,labels1,labels2,des1,des2,matches):
 		dispImg=np.zeros((labels1.shape))
