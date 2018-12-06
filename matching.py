@@ -52,14 +52,14 @@ class SPMatcher:
 			u=uu[counts==1]
 			indices=np.array(unmatched)[indice[counts==1]]
 			to_append=[[i,j] for i,j in zip(indices,u)]
-			print("Before",len(matches),len(unmatched))
+			#print("Before",len(matches),len(unmatched))
 			#[unmatched.pop(unmatched.index(i)) for i in indices]
 			for i in indices:
 				#print(len(indices),indices)
 				check_matched[i]=True
 				unmatched.pop(unmatched.index(i))
 			matches.extend(to_append)
-			print("After: ",len(matches),len(unmatched))
+			#print("After: ",len(matches),len(unmatched))
 			#print("Funny match: "+ str(to_append))
 			
 			#resolve duplicate best matches
@@ -70,11 +70,11 @@ class SPMatcher:
 				min_idx=np.argmin([dist_dict[i][level][1] for i in matches_to_test])
 				winner=matches_to_test[min_idx]
 				winner_idx=np.where(temp_matches==dm)[0][min_idx]
-				print(dm,matches_to_test)
+				#print(dm,matches_to_test)
 				#print("Before",len(matches),len(unmatched))
 				unmatched.pop(unmatched.index(winner))
 				matches.append([winner,temp_matches[winner_idx]])
-				print([winner,temp_matches[winner_idx]])
+				#print([winner,temp_matches[winner_idx]])
 				#print("After: ",len(matches),len(unmatched))
 			level += 1
 

@@ -30,47 +30,36 @@ class SuperPixelStereo:
 		print(hogL.shape,chL.shape,ijL.shape)
 		desL=np.concatenate((ijL,chL,hogL),axis=1)#.astype(np.uint16)
 		desR=np.concatenate((ijR,chR,hogR),axis=1)#.astype(np.uint16)
-		#desL=hogL.astype(np.uint8)
-		#desR=hogR.astype(np.uint8)
-		#print(desL[1,:],desL[2,:])
 		self.getPixelCentroid(labelsL)
-		#st=time.time()
-		#SPMatcher(desL,desR)
-		#print("Matching time: ",time.time()-st)
-		#plt.imshow(labelsL/6),plt.show()
-		#plt.imshow(labelsR/6),plt.show()
-		#matches =self.matchSP(desL,desR)
+		
 		matcher=SPMatcher()
 		st=time.time()
 		matches=matcher.match(desL,desR)
 		print("Distance time: " + str(time.time()-st))
-		# create BFMatcher object
-		#bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-		# Match descriptors.
-		#matches = bf.match(desL,desR)
-		#print(matches[11].trainIdx)
-		# Sort them in the order of their distance.
-		#matches = sorted(matches, key = lambda x:x.distance)
-		# Draw first 10 matches.
-
-
 		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,np.random.choice(matches,20),None)
 		#plt.imshow(img3),plt.show()
 		dispL=self.match2Disparity(labelsL,labelsR,desL,desR,matches)
-		cv2.imwrite('Matches.png',img3)
-		cv2.imwrite('LeftDisp.png',dispL)
-		return dispL
+		cv2.imwrite('MatchesL.png',img3)
+		cv2.imwrite('DispL.png',dispL)
 
-		#plt.imshow(dispL),plt.show()
-		#plt.imshow(img3),plt.show()
-
-		"""matches = bf.match(desR,desL)
-		#print(matches[11].trainIdx)
-		# Sort them in the order of their distance.
-		matches = sorted(matches, key = lambda x:x.distance)
-		# Draw first 10 matches.
+		"""st=time.time()
+		matches=matcher.match(desR,desL)
+		print("Distance time: " + str(time.time()-st))
 		img3 = cv2.drawMatches(self.markedR,kp2,self.markedL,kp1,np.random.choice(matches,20),None)
-		#plt.imshow(img3),plt.show()"""
+		#plt.imshow(img3),plt.show()
+		dispR=self.match2Disparity(labelsR,labelsL,desR,desL,matches)
+		cv2.imwrite('MatchesR.png',img3)
+		cv2.imwrite('DispR.png',dispR)
+
+		matches=self.matchSP(desL,desR)
+		img3 = cv2.drawMatches(self.markedL,kp1,self.markedR,kp2,np.random.choice(matches,20),None)
+		#plt.imshow(img3),plt.show()
+		dispL=self.match2Disparity(labelsL,labelsR,desL,desR,matches)
+		cv2.imwrite('MatchesQ.png',img3)
+		cv2.imwrite('DispQ.png',dispL)"""
+
+
+		return dispL
 
 	def segmentImageSLIC(self,imL,imR):
 		smoothness=50.0
