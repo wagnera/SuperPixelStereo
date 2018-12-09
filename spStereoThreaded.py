@@ -1,3 +1,4 @@
+import Queue, threading
 import cv2
 import numpy
 import time
@@ -10,15 +11,57 @@ from math import ceil
 from scipy import signal 
 from skimage.feature import match_template
 
-class SuperPixelStereo:
+class SuperPixelStereoT:
 	def __init__(self):
 		self.Init = False
+		#Threading Stuff
+		self.start_threads()
+
+	def start_threads(self):	
+		self.num_threads=12
+		self.q=Queue.Queue() #last in first out, not sure if this is the behaviour we want
+		self.threads = []
+		for i in range(self.num_threads): #start up threads
+			t = threading.Thread(target=self.thread_worker)
+			t.start()
+			self.threads.append(t)
+	def add_thread(self):
+		t = threading.Thread(target=self.thread_worker)
+		t.start()
+		self.threads.append(t)
+		self.num_threads+=1
+
+	def shutdown_threads(self):
+		for i in range(self.num_threads):
+		    self.q.put(None)
+		for t in self.threads:
+		    t.join()
 
 	def initialize(self,im):
 		self.height,self.width,self.channels = im.shape
 		self.seeds = cv2.ximgproc.createSuperpixelSEEDS(self.width,self.height,self.channels, 100, 4,5,5)
 		#self.slic = cv2.ximgproc.createSuperpixelSLIC(converted,algorithm+SLIC,region_size,float(ruler))
 		self.Init = True
+
+	def thread_worker(self):
+		try:
+			[row_img,patch,mask,sp,ijL]=self.q.get()
+		except TypeError:
+			self.q.task_done()
+			return
+		print("Processing SP: "+str(sp)+" of "+str(self.NSP))
+		row_img = (row_img - np.mean(row_img)) / (np.std(row_img) * row_img.size)
+		patch = (patch - np.mean(patch)) / (np.std(patch))
+		try:
+			test=match_template(row_img, patch)
+		except:
+			print("Problem in match")
+			self.q.task_done()
+			return
+		disp_value=int(abs(np.argmax(test[0])-ijL[sp][0])-((self.width-test.shape[1])/2))
+		disp_value=max(min(255/4, disp_value), 0)
+		np.putmask(self.dispImg,mask,disp_value)
+		self.q.task_done()
 
 	def getDisparity(self,imL,imR):
 		if ~self.Init:
@@ -33,10 +76,9 @@ class SuperPixelStereo:
 		imRg=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
 		gt_disp=cv2.imread('dataset/middleburyLeftdisp.png',0)
 		#######################
-		dispImg=np.zeros((labelsL.shape),dtype=np.uint8)
+		self.dispImg=np.zeros((labelsL.shape),dtype=np.uint8)
 		Js,Is=np.meshgrid(range(self.width),range(self.height))
 		for sp in range(self.NSP):
-			print("Processing SP: "+str(sp)+" of "+str(self.NSP))
 			mask=labelsL==sp
 			imin=np.amin(Is[mask])
 			jmin=np.amin(Js[mask])
@@ -44,38 +86,15 @@ class SuperPixelStereo:
 			jmax=np.amax(Js[mask])
 			row_img=imR[imin:imax,:].astype(float)
 			patch=imL[imin:imax,jmin:jmax].astype(float)
-			row_img = (row_img - np.mean(row_img)) / (np.std(row_img) * row_img.size)
-			patch = (patch - np.mean(patch)) / (np.std(patch))
-			try:
-				test=match_template(row_img, patch)
-			except:
-				print("Problem in match")
-				print(jmin,jmax,imin,imax)
-				continue
-			"""if sp==50:
-				plt.plot(test[0])
-				plt.xlabel('Scanline Index')
-				plt.ylabel('Cross Correlation')
-				plt.title('Cross Correlation for Superpixel')"""
-				#plt.show()
-			#print(int(abs(np.argmax(test[0])-ijL[sp][0])),jmin,jmax,imin,imax,ijL[sp][0],np.argmax(test[0]))
-			#exit()
-			print((self.width-test.shape[1])/2)
-			disp_value=int(abs(np.argmax(test[0])-ijL[sp][0])-((self.width-test.shape[1])/2))
-			disp_value=max(min(255/4, disp_value), 0)
-			np.putmask(dispImg,mask,disp_value)
-
+			self.q.put([row_img,patch,mask,sp,ijL])
+			self.add_thread()
+			
+		self.q.join()
+		dispImg=self.dispImg
 		norm_disp=((dispImg.astype(float)/float(np.amax(dispImg)))*255).astype(np.uint8)
 		cv2.imwrite('Disp32.png',dispImg*4)
 		cv2.imwrite('Disparity_RGB.png',cv2.applyColorMap(dispImg,cv2.COLORMAP_JET))
 		cv2.imwrite('Disp32_filter.png',signal.medfilt(dispImg*4,kernel_size=5))
-		"""plt.plot(dispImg[100,:])
-		plt.plot(gt_disp[100,:]/4)
-		plt.legend(['Calculated', 'Ground truth'], loc='upper left')
-		plt.xlabel('Scanline Index')
-		plt.ylabel('Disparity (Pixels)')
-		plt.title('Disparity at 100th Scanline')"""
-		#plt.show()
 		return dispImg
 
 	def segmentImageSLIC(self,imL,imR):
@@ -165,14 +184,4 @@ class SuperPixelStereo:
 			ijPts.append(np.array(temp.pt))
 		print("Centroid Time: "+str(time.time()-st))
 		return keyPts,np.array(ijPts)
-
-	def match2Disparity(self,labels1,labels2,des1,des2,matches):
-		dispImg=np.zeros((labels1.shape))
-		for match,label in zip(matches,range(len(matches))):
-			SP1=des1[match.queryIdx,0]
-			SP2=des2[match.trainIdx,0]
-			disp=abs(SP1-SP2)
-			#print(SP1,SP2,int(disp))
-			np.putmask(dispImg,np.equal(match.queryIdx,labels1),int(disp))
-		return dispImg
 
