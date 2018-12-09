@@ -1,4 +1,5 @@
 import Queue, threading
+import atexit
 import cv2
 import numpy
 import time
@@ -10,11 +11,23 @@ from matching import SPMatcher
 from math import ceil
 from scipy import signal 
 from skimage.feature import match_template
+import sys
+
+def progress(count, total, status=''):
+    bar_len = 40
+    filled_len = int(round(bar_len * count / float(total)))
+
+    percents = round(100.0 * count / float(total), 1)
+    bar = '=' * filled_len + '-' * (bar_len - filled_len)
+
+    sys.stdout.write('\r[%s] %s%s ...%s' % (bar, percents, '%', status))
+    sys.stdout.flush()
 
 class SuperPixelStereoT:
 	def __init__(self):
 		self.Init = False
 		#Threading Stuff
+		atexit.register(self.shutdown_threads)
 		self.start_threads()
 
 	def start_threads(self):	
@@ -49,7 +62,8 @@ class SuperPixelStereoT:
 		except TypeError:
 			self.q.task_done()
 			return
-		print("Processing SP: "+str(sp)+" of "+str(self.NSP))
+		#print("\rProcessing SP: "+str(sp)+" of "+str(self.NSP), end="")
+		progress(sp,self.NSP,status='Processing: ')
 		row_img = (row_img - np.mean(row_img)) / (np.std(row_img) * row_img.size)
 		patch = (patch - np.mean(patch)) / (np.std(patch))
 		try:
@@ -59,7 +73,7 @@ class SuperPixelStereoT:
 			self.q.task_done()
 			return
 		disp_value=int(abs(np.argmax(test[0])-ijL[sp][0])-((self.width-test.shape[1])/2))
-		disp_value=max(min(255/4, disp_value), 0)
+		disp_value=max(min(1000, disp_value), 0)
 		np.putmask(self.dispImg,mask,disp_value)
 		self.q.task_done()
 
@@ -76,7 +90,7 @@ class SuperPixelStereoT:
 		imRg=cv2.cvtColor(imR,cv2.COLOR_BGR2GRAY)
 		gt_disp=cv2.imread('dataset/middleburyLeftdisp.png',0)
 		#######################
-		self.dispImg=np.zeros((labelsL.shape),dtype=np.uint8)
+		self.dispImg=np.zeros((labelsL.shape),dtype=int)
 		Js,Is=np.meshgrid(range(self.width),range(self.height))
 		for sp in range(self.NSP):
 			mask=labelsL==sp
@@ -91,10 +105,10 @@ class SuperPixelStereoT:
 			
 		self.q.join()
 		dispImg=self.dispImg
-		norm_disp=((dispImg.astype(float)/float(np.amax(dispImg)))*255).astype(np.uint8)
-		cv2.imwrite('Disp32.png',dispImg*4)
-		cv2.imwrite('Disparity_RGB.png',cv2.applyColorMap(dispImg,cv2.COLORMAP_JET))
-		cv2.imwrite('Disp32_filter.png',signal.medfilt(dispImg*4,kernel_size=5))
+		#norm_disp=((dispImg.astype(float)/float(np.amax(dispImg)))*255).astype(np.uint8)
+		#cv2.imwrite('Disp32.png',dispImg*4)
+		#cv2.imwrite('Disparity_RGB.png',cv2.applyColorMap(dispImg,cv2.COLORMAP_JET))
+		#cv2.imwrite('Disp32_filter.png',signal.medfilt(dispImg*4,kernel_size=5))
 		return dispImg
 
 	def segmentImageSLIC(self,imL,imR):

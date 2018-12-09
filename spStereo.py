@@ -80,7 +80,7 @@ class SuperPixelStereo:
 
 	def segmentImageSLIC(self,imL,imR):
 		smoothness=100.0
-		size=25
+		size=10
 
 		st=time.time()
 		imLLAB = cv2.cvtColor(imL, cv2.COLOR_BGR2LAB)
